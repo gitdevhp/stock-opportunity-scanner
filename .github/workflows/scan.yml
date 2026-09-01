@@ -12,20 +12,29 @@ on:
           - morning
           - intraday
           - evening
+
   schedule:
-    # GitHub schedules use UTC. Candidate morning/evening times cover
-    # Central Time daylight-saving changes; scanner.py gates the actual send.
-    - cron: "35 13 * * 1-5"
-    - cron: "35 14 * * 1-5"
-    - cron: "5 21 * * 1-5"
-    - cron: "5 22 * * 1-5"
-    # Hourly candidate runs covering both CDT (14-20 UTC) and CST (15-21 UTC).
-    # scanner.py only sends at 09:00-15:00 America/Chicago.
+    # GitHub Actions cron uses UTC.
+    #
+    # These candidate runs cover both CDT (UTC-5) and CST (UTC-6).
+    # scanner.py determines whether the current America/Chicago time
+    # is actually one of our desired scan windows.
+    #
+    # Morning: 08:00 Central
+    - cron: "0 13 * * 1-5"
+    - cron: "0 14 * * 1-5"
+
+    # Intraday: 09:00 through 15:00 Central
     - cron: "0 14-21 * * 1-5"
+
+    # Evening: 16:00 Central
+    - cron: "0 21 * * 1-5"
+    - cron: "0 22 * * 1-5"
 
 jobs:
   scan:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
 
@@ -51,25 +60,37 @@ jobs:
             HOUR=$(TZ=America/Chicago date +%H)
             MIN=$(TZ=America/Chicago date +%M)
             TOTAL=$((10#$HOUR * 60 + 10#$MIN))
-            if [ "$TOTAL" -ge 500 ] && [ "$TOTAL" -le 560 ]; then
+
+            # Morning: 08:00-08:25 Central
+            if [ "$TOTAL" -ge 480 ] && [ "$TOTAL" -le 505 ]; then
               echo "mode=morning" >> "$GITHUB_OUTPUT"
+
+            # Intraday: 09:00-15:20 Central
             elif [ "$TOTAL" -ge 540 ] && [ "$TOTAL" -le 920 ]; then
-              # 09:00-15:20 local; scanner.py gates exact hourly windows.
               echo "mode=intraday" >> "$GITHUB_OUTPUT"
-            else
+
+            # Evening: 16:00-16:25 Central
+            elif [ "$TOTAL" -ge 960 ] && [ "$TOTAL" -le 985 ]; then
               echo "mode=evening" >> "$GITHUB_OUTPUT"
+
+            else
+              echo "mode=none" >> "$GITHUB_OUTPUT"
             fi
           fi
 
       - name: Run scanner and send Discord report
+        if: steps.mode.outputs.mode != 'none'
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GITHUB_ACTIONS: "true"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: python scanner.py --mode "${{ steps.mode.outputs.mode }}" --send
 
       - name: Upload report
+        if: steps.mode.outputs.mode != 'none'
         uses: actions/upload-artifact@v4
         with:
           name: stock-scan-report
           path: reports/
+          if-no-files-found: warn
           retention-days: 7
