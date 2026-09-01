@@ -513,7 +513,16 @@ def main():
     args = ap.parse_args()
 
     cfg = load_config()
-    if not args.force_time and not should_run(args.mode, cfg) and os.getenv("GITHUB_ACTIONS") == "true":
+    # Scheduled GitHub Actions runs obey the configured Central Time windows.
+    # Manual workflow_dispatch runs are allowed to execute immediately for testing.
+    is_manual_run = os.getenv("GITHUB_EVENT_NAME") == "workflow_dispatch"
+    
+    if (
+        not args.force_time
+        and not is_manual_run
+        and os.getenv("GITHUB_ACTIONS") == "true"
+        and not should_run(args.mode, cfg)
+    ):
         print("Outside configured local-time window; exiting without sending.")
         return
 
