@@ -1,4 +1,4 @@
-name: Stock Opportunity Scanner v1
+name: Stock Opportunity Scanner
 
 on:
   workflow_dispatch:
@@ -27,7 +27,7 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout
