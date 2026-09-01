@@ -1,4 +1,4 @@
-name: Stock Opportunity Scanner
+name: Stock Opportunity Scanner v1
 
 on:
   workflow_dispatch:
