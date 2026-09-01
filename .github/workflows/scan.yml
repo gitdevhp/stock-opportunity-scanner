@@ -1,0 +1,75 @@
+name: Stock Opportunity Scanner
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Scan mode"
+        required: true
+        default: evening
+        type: choice
+        options:
+          - morning
+          - intraday
+          - evening
+  schedule:
+    # GitHub schedules use UTC. Candidate morning/evening times cover
+    # Central Time daylight-saving changes; scanner.py gates the actual send.
+    - cron: "35 13 * * 1-5"
+    - cron: "35 14 * * 1-5"
+    - cron: "5 21 * * 1-5"
+    - cron: "5 22 * * 1-5"
+    # Hourly candidate runs covering both CDT (14-20 UTC) and CST (15-21 UTC).
+    # scanner.py only sends at 09:00-15:00 America/Chicago.
+    - cron: "0 14-21 * * 1-5"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine scan mode
+        id: mode
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          else
+            HOUR=$(TZ=America/Chicago date +%H)
+            MIN=$(TZ=America/Chicago date +%M)
+            TOTAL=$((10#$HOUR * 60 + 10#$MIN))
+            if [ "$TOTAL" -ge 500 ] && [ "$TOTAL" -le 560 ]; then
+              echo "mode=morning" >> "$GITHUB_OUTPUT"
+            elif [ "$TOTAL" -ge 540 ] && [ "$TOTAL" -le 920 ]; then
+              # 09:00-15:20 local; scanner.py gates exact hourly windows.
+              echo "mode=intraday" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=evening" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Run scanner and send Discord report
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_ACTIONS: "true"
+        run: python scanner.py --mode "${{ steps.mode.outputs.mode }}" --send
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: stock-scan-report
+          path: reports/
+          retention-days: 7
