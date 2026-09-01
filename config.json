@@ -1,0 +1,43 @@
+{
+  "capital": 333.0,
+  "timezone": "America/Chicago",
+  "morning_local_hour": 8,
+  "morning_local_minute": 35,
+  "evening_local_hour": 17,
+  "evening_local_minute": 5,
+  "min_score_to_report": 65,
+  "high_conviction_score": 85,
+  "max_candidates": 10,
+  "history_days": 420,
+  "min_price": 3.0,
+  "min_average_volume": 300000,
+  "max_atr_pct": 12.0,
+  "risk_fraction": 0.04,
+  "watchlist_additions": [
+    "NVDA",
+    "AMZN",
+    "AMD",
+    "SMCI",
+    "BILL",
+    "COIN",
+    "CF",
+    "MSFT",
+    "PINS",
+    "RIVN",
+    "DUOL",
+    "AVGO",
+    "MU",
+    "GOOGL",
+    "META"
+  ],
+  "exclude": [
+    "TQQQ",
+    "SQQQ",
+    "SOXL",
+    "SOXS",
+    "SPXL",
+    "SPXS",
+    "UVXY",
+    "VXX"
+  ]
+}
