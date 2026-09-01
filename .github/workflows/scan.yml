@@ -1,4 +1,4 @@
-name: Stock Opportunity Scanner v2
+name: Stock Opportunity Scanner
 
 on:
   workflow_dispatch:
@@ -12,29 +12,54 @@ on:
           - morning
           - intraday
           - evening
+
   schedule:
-    # GitHub cron is UTC. Candidate runs cover both CDT and CST;
-    # scanner.py gates the actual America/Chicago windows.
-    - cron: "0 13 * * 1-5"
-    - cron: "0 14 * * 1-5"
-    - cron: "0 14-21 * * 1-5"
-    - cron: "0 21 * * 1-5"
-    - cron: "0 22 * * 1-5"
+    # All schedules are explicitly Central Time.
+    # America/Chicago automatically handles CDT/CST.
+    
+    # Morning
+    - cron: "5 8 * * 1-5"
+      timezone: "America/Chicago"
+
+    # Hourly intraday scans
+    - cron: "5 9 * * 1-5"
+      timezone: "America/Chicago"
+    - cron: "5 10 * * 1-5"
+      timezone: "America/Chicago"
+    - cron: "5 11 * * 1-5"
+      timezone: "America/Chicago"
+    - cron: "5 12 * * 1-5"
+      timezone: "America/Chicago"
+    - cron: "5 13 * * 1-5"
+      timezone: "America/Chicago"
+    - cron: "5 14 * * 1-5"
+      timezone: "America/Chicago"
+    - cron: "5 15 * * 1-5"
+      timezone: "America/Chicago"
+
+    # Evening
+    - cron: "5 16 * * 1-5"
+      timezone: "America/Chicago"
 
 jobs:
   scan:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install dependencies
         run: pip install -r requirements.txt
+
       - name: Determine scan mode
         id: mode
         shell: bash
@@ -45,16 +70,21 @@ jobs:
             HOUR=$(TZ=America/Chicago date +%H)
             MIN=$(TZ=America/Chicago date +%M)
             TOTAL=$((10#$HOUR * 60 + 10#$MIN))
-            if [ "$TOTAL" -ge 480 ] && [ "$TOTAL" -le 505 ]; then
+
+            if [ "$TOTAL" -ge 480 ] && [ "$TOTAL" -le 525 ]; then
               echo "mode=morning" >> "$GITHUB_OUTPUT"
+
             elif [ "$TOTAL" -ge 540 ] && [ "$TOTAL" -le 920 ]; then
               echo "mode=intraday" >> "$GITHUB_OUTPUT"
-            elif [ "$TOTAL" -ge 960 ] && [ "$TOTAL" -le 985 ]; then
+
+            elif [ "$TOTAL" -ge 960 ] && [ "$TOTAL" -le 1005 ]; then
               echo "mode=evening" >> "$GITHUB_OUTPUT"
+
             else
               echo "mode=none" >> "$GITHUB_OUTPUT"
             fi
           fi
+
       - name: Run scanner and send Discord report
         if: steps.mode.outputs.mode != 'none'
         env:
@@ -62,11 +92,12 @@ jobs:
           GITHUB_ACTIONS: "true"
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: python scanner.py --mode "${{ steps.mode.outputs.mode }}" --send
+
       - name: Upload report
         if: steps.mode.outputs.mode != 'none'
         uses: actions/upload-artifact@v4
         with:
           name: stock-scan-report
           path: reports/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
